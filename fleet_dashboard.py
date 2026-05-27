@@ -1,10 +1,16 @@
 """
 Fleet GPS Dashboard Generator
 Reads fleet_status.csv and generates an interactive HTML dashboard.
+
+Usage:
+    python fleet_dashboard.py              # Normal: read CSV → generate HTML
+    python fleet_dashboard.py --inject     # Inject noisy rows, then generate
+    python fleet_dashboard.py --reset      # Remove noisy rows, then generate
 """
 
 import csv
 import json
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -26,6 +32,128 @@ def parse_time(value):
     return datetime.strptime(value, "%Y-%m-%d %H:%M:%S")
 
 
+# --- Noisy data injection (for testing dashboard robustness) ---
+
+NOISY_ROWS = [
+    {
+        "device_id": "GPS-031",
+        "name": "Ghost Tracker",
+        "status": "active",
+        "battery_pct": "-5",
+        "lat": "-33.87",
+        "lon": "151.21",
+        "last_seen": "2026-06-15 08:00:00",  # future date
+        "location": "Sydney",
+    },
+    {
+        "device_id": "GPS-032",
+        "name": "Null Island Unit",
+        "status": "idle",
+        "battery_pct": "100",
+        "lat": "0.0",
+        "lon": "0.0",  # Null Island (0,0) — in the ocean
+        "last_seen": "2025-01-01 00:00:00",  # very old
+        "location": "Null Island",
+    },
+    {
+        "device_id": "GPS-033",
+        "name": "Duplicate Alpha",
+        "status": "offline",
+        "battery_pct": "50",
+        "lat": "-37.81",
+        "lon": "144.96",
+        "last_seen": "2026-05-20 12:00:00",
+        "location": "Melbourne",
+    },
+    {
+        "device_id": "GPS-033",
+        "name": "Duplicate Alpha COPY",
+        "status": "active",
+        "battery_pct": "99",
+        "lat": "-37.82",
+        "lon": "144.97",
+        "last_seen": "2026-05-27 09:00:00",
+        "location": "Melbourne",
+    },
+    {
+        "device_id": "GPS-034",
+        "name": "Arctic Drifter",
+        "status": "low_battery",
+        "battery_pct": "2",
+        "lat": "64.15",
+        "lon": "-21.94",  # Reykjavik, Iceland — way outside Australia
+        "last_seen": "2026-05-27 10:29:00",
+        "location": "Reykjavik",
+    },
+]
+
+
+NOISY_IDS = {r["device_id"] for r in NOISY_ROWS}
+
+
+def inject_noisy_rows():
+    """Append edge-case rows to CSV for stress-testing the dashboard."""
+    with CSV_PATH.open(newline="", encoding="utf-8-sig") as f:
+        existing = list(csv.DictReader(f))
+
+    fieldnames = list(existing[0].keys()) if existing else []
+
+    # Remove any previous noisy rows first (exact match)
+    clean = [r for r in existing if r["device_id"] not in NOISY_IDS]
+
+    # Add noisy rows
+    clean.extend(NOISY_ROWS)
+
+    with CSV_PATH.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(clean)
+
+    print(f"Injected {len(NOISY_ROWS)} noisy rows → {CSV_PATH.name}")
+    print("  • Negative battery (GPS-031)")
+    print("  • Null Island 0,0 coords (GPS-032)")
+    print("  • Duplicate device ID (GPS-033 x2)")
+    print("  • Off-map coordinates (GPS-034)")
+    print("  • Future timestamp (GPS-031)")
+    return clean
+
+
+def reset_noisy_rows():
+    """Remove all injected noisy rows from CSV."""
+    with CSV_PATH.open(newline="", encoding="utf-8-sig") as f:
+        existing = list(csv.DictReader(f))
+
+    clean = [r for r in existing if r["device_id"] not in NOISY_IDS]
+    removed = len(existing) - len(clean)
+
+    fieldnames = list(existing[0].keys()) if existing else []
+    with CSV_PATH.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(clean)
+
+    print(f"Removed {removed} noisy rows from {CSV_PATH.name}")
+    return clean
+
+
+# --- CLI handling ---
+
+if "--inject" in sys.argv:
+    devices_raw = inject_noisy_rows()
+elif "--reset" in sys.argv:
+    devices_raw = reset_noisy_rows()
+else:
+    # --- Read CSV (normal mode) ---
+    if not CSV_PATH.exists():
+        print(f"ERROR: {CSV_PATH} not found!")
+        print("Make sure fleet_status.csv is in the same folder as this script.")
+        exit(1)
+    with CSV_PATH.open(newline="", encoding="utf-8-sig") as f:
+        devices_raw = list(csv.DictReader(f))
+
+print(f"Loaded {len(devices_raw)} devices from {CSV_PATH.name}")
+
+
 def human_ago(dt, ref):
     """Return human-readable time difference like '5 min ago'."""
     mins = int((ref - dt).total_seconds() // 60)
@@ -37,18 +165,8 @@ def human_ago(dt, ref):
     return f"{hrs // 24} days ago"
 
 
-# --- Read CSV ---
-if not CSV_PATH.exists():
-    print(f"ERROR: {CSV_PATH} not found!")
-    print("Make sure fleet_status.csv is in the same folder as this script.")
-    exit(1)
-
-with CSV_PATH.open(newline="", encoding="utf-8-sig") as f:
-    devices = list(csv.DictReader(f))
-
-print(f"Loaded {len(devices)} devices from {CSV_PATH.name}")
-
 # --- Process data ---
+devices = devices_raw
 for d in devices:
     d["battery_pct"] = int(d["battery_pct"])
     d["lat"] = float(d["lat"])
