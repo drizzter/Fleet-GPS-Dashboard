@@ -1,0 +1,100 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Fleet Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body{margin:0;font-family:Arial,sans-serif;background:#f1f5f9;color:#0f172a}
+header{background:#0f172a;color:white;padding:24px 32px}
+h1{margin:0;font-size:28px} p{margin:6px 0 0;color:#cbd5e1}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;padding:24px 32px}
+.card{background:white;border-radius:16px;padding:18px;box-shadow:0 8px 20px #0001}
+.card b{font-size:30px;display:block;margin-top:6px}
+.main{display:grid;grid-template-columns:1.2fr 1fr;gap:24px;padding:0 32px 32px}
+.panel{background:white;border-radius:18px;padding:18px;box-shadow:0 8px 20px #0001}
+#map{height:560px;background:#e0f2fe;border-radius:16px;position:relative;overflow:hidden}
+.marker{position:absolute;width:16px;height:16px;border-radius:50%;border:3px solid white;transform:translate(-50%,-50%);box-shadow:0 3px 10px #0005;cursor:pointer}
+.marker:hover::after{content:attr(data-tip);position:absolute;left:18px;top:-8px;background:#0f172a;color:white;padding:8px 10px;border-radius:8px;white-space:nowrap;z-index:5}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:10px;border-bottom:1px solid #e2e8f0;text-align:left}
+th{font-size:12px;text-transform:uppercase;color:#64748b}
+.badge{color:white;border-radius:999px;padding:4px 9px;font-size:12px;font-weight:bold}
+.legend{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.dot{width:11px;height:11px;border-radius:50%;display:inline-block;margin-right:5px}
+@media(max-width:900px){.main{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+<h1>Fleet GPS Dashboard</h1>
+<p>35 GPS tracking devices across Australia &middot; Snapshot based on latest CSV ping</p>
+</header>
+
+<section class="cards" id="summary"></section>
+
+<section class="main">
+<div class="panel">
+<h2>Device Map</h2>
+<div class="legend" id="legend"></div>
+<div id="map"></div>
+</div>
+
+<div class="panel">
+<h2>Device List</h2>
+<table>
+<thead><tr><th>Device</th><th>Status</th><th>Battery</th><th>Last Seen</th><th>Location</th></tr></thead>
+<tbody id="rows"></tbody>
+</table>
+</div>
+</section>
+
+<script>
+const devices = [{"device_id": "GPS-001", "name": "Fleet Alpha", "status": "idle", "battery_pct": 30, "lat": -33.780734, "lon": 151.51943, "last_seen": "2026-05-27 07:30:00", "location": "Sydney", "seen_ago": "19 days ago", "color": "#f59e0b"}, {"device_id": "GPS-002", "name": "Fleet Bravo", "status": "active", "battery_pct": 69, "lat": -37.611861, "lon": 144.800251, "last_seen": "2026-05-27 10:16:00", "location": "Melbourne", "seen_ago": "18 days ago", "color": "#16a34a"}, {"device_id": "GPS-003", "name": "Fleet Charlie", "status": "active", "battery_pct": 65, "lat": -27.012787, "lon": 152.866595, "last_seen": "2026-05-27 10:05:00", "location": "Brisbane", "seen_ago": "18 days ago", "color": "#16a34a"}, {"device_id": "GPS-004", "name": "Fleet Delta", "status": "offline", "battery_pct": 38, "lat": -32.353284, "lon": 116.207494, "last_seen": "2026-05-24 10:30:00", "location": "Perth", "seen_ago": "21 days ago", "color": "#64748b"}, {"device_id": "GPS-005", "name": "Fleet Echo", "status": "idle", "battery_pct": 64, "lat": -34.622872, "lon": 138.829732, "last_seen": "2026-05-27 08:30:00", "location": "Adelaide", "seen_ago": "18 days ago", "color": "#f59e0b"}, {"device_id": "GPS-006", "name": "Truck North", "status": "active", "battery_pct": 95, "lat": -27.546884, "lon": 153.278534, "last_seen": "2026-05-27 10:11:00", "location": "Gold Coast", "seen_ago": "18 days ago", "color": "#16a34a"}, {"device_id": "GPS-007", "name": "Truck South", "status": "active", "battery_pct": 83, "lat": -32.600595, "lon": 151.89852, "last_seen": "2026-05-27 09:53:00", "location": "Newcastle", "seen_ago": "18 days ago", "color": "#16a34a"}, {"device_id": "GPS-008", "name": "Truck East", "status": "active", "battery_pct": 74, "lat": -35.587711, "lon": 148.699555, "last_seen": "2026-05-27 10:11:00", "location": "Canberra", "seen_ago": "18 days ago", "color": "#16a34a"}, {"device_id": "GPS-009", "name": "Truck West", "status": "active", "battery_pct": 66, "lat": -33.934778, "lon": 151.245318, "last_seen": "2026-05-27 10:05:00", "location": "Wollongong", "seen_ago": "18 days ago", "color": "#16a34a"}, {"device_id": "GPS-010", "name": "Truck Central", "status": "active", "battery_pct": 83, "lat": -43.102026, "lon": 147.465684, "last_seen": "2026-05-27 10:19:00", "location": "Hobart", "seen_ago": "18 days ago", "color": "#16a34a"}, {"device_id": "GPS-011", "name": "Van Metro 1", "status": "active", "battery_pct": 77, "lat": -38.279819, "lon": 144.069507, "last_seen": "2026-05-27 09:45:00", "location": "Geelong", "seen_ago": "18 days ago", "color": "#16a34a"}, {"device_id": "GPS-012", "name": "Van Metro 2", "status": "offline", "battery_pct": 38, "lat": -18.823345, "lon": 146.948035, "last_seen": "2026-05-25 10:30:00", "location": "Townsville", "seen_ago": "20 days ago", "color": "#64748b"}, {"device_id": "GPS-013", "name": "Van Metro 3", "status": "low_battery", "battery_pct": 12, "lat": -16.88586, "lon": 145.514811, "last_seen": "2026-05-27 09:32:00", "location": "Cairns", "seen_ago": "18 days ago", "color": "#dc2626"}, {"device_id": "GPS-014", "name": "Van Regional 1", "status": "idle", "battery_pct": 74, "lat": -12.690052, "lon": 131.265391, "last_seen": "2026-05-27 06:30:00", "location": "Darwin", "seen_ago": "19 days ago", "color": "#f59e0b"}, {"device_id": "GPS-015", "name": "Van Regional 2", "status": "active", "battery_pct": 63, "lat": -27.375386, "lon": 152.292852, "last_seen": "2026-05-27 10:15:00", "location": "Toowoomba", "seen_ago": "18 days ago", "color": "#16a34a"}, {"device_id": "GPS-016", "name": "Unit Hawk", "status": "offline", "battery_pct": 25, "lat": -37.238197, "lon": 144.155046, "last_seen": "2026-05-24 10:30:00", "location": "Ballarat", "seen_ago": "21 days ago", "color": "#64748b"}, {"device_id": "GPS-017", "name": "Unit Eagle", "status": "active", "battery_pct": 96, "lat": -37.193811, "lon": 144.693136, "last_seen": "2026-05-27 10:09:00", "location": "Bendigo", "seen_ago": "18 days ago", "color": "#16a34a"}, {"device_id": "GPS-018", "name": "Unit Falcon", "status": "active", "battery_pct": 89, "lat": -41.717373, "lon": 147.139231, "last_seen": "2026-05-27 10:20:00", "location": "Launceston", "seen_ago": "18 days ago", "color": "#16a34a"}, {"device_id": "GPS-019", "name": "Unit Osprey", "status": "idle", "battery_pct": 65, "lat": -21.40512, "lon": 148.936628, "last_seen": "2026-05-27 05:30:00", "location": "Mackay", "seen_ago": "19 days ago", "color": "#f59e0b"}, {"device_id": "GPS-020", "name": "Unit Raven", "status": "active", "battery_pct": 97, "lat": -23.132986, "lon": 150.438434, "last_seen": "2026-05-27 10:04:00", "location": "Rockhampton", "seen_ago": "18 days ago", "color": "#16a34a"}, {"device_id": "GPS-021", "name": "Scout Alpha", "status": "active", "battery_pct": 68, "lat": -25.008004, "lon": 152.847326, "last_seen": "2026-05-27 09:57:00", "location": "Bundaberg", "seen_ago": "18 days ago", "color": "#16a34a"}, {"device_id": "GPS-022", "name": "Scout Bravo", "status": "low_battery", "battery_pct": 6, "lat": -25.296484, "lon": 153.105782, "last_seen": "2026-05-27 10:01:00", "location": "Hervey Bay", "seen_ago": "18 days ago", "color": "#dc2626"}, {"device_id": "GPS-023", "name": "Scout Charlie", "status": "active", "battery_pct": 87, "lat": -34.992554, "lon": 147.662079, "last_seen": "2026-05-27 09:51:00", "location": "Wagga Wagga", "seen_ago": "18 days ago", "color": "#16a34a"}, {"device_id": "GPS-024", "name": "Scout Delta", "status": "offline", "battery_pct": 29, "lat": -36.506472, "lon": 146.801619, "last_seen": "2026-05-22 10:30:00", "location": "Albury", "seen_ago": "23 days ago", "color": "#64748b"}, {"device_id": "GPS-025", "name": "Scout Echo", "status": "active", "battery_pct": 60, "lat": -31.678586, "lon": 152.963226, "last_seen": "2026-05-27 09:46:00", "location": "Port Macquarie", "seen_ago": "18 days ago", "color": "#16a34a"}, {"device_id": "GPS-026", "name": "Patrol 01", "status": "active", "battery_pct": 94, "lat": -30.859278, "lon": 151.10171, "last_seen": "2026-05-27 10:12:00", "location": "Tamworth", "seen_ago": "18 days ago", "color": "#16a34a"}, {"device_id": "GPS-027", "name": "Patrol 02", "status": "idle", "battery_pct": 48, "lat": -33.011401, "lon": 148.940175, "last_seen": "2026-05-27 03:30:00", "location": "Orange", "seen_ago": "19 days ago", "color": "#f59e0b"}, {"device_id": "GPS-028", "name": "Patrol 03", "status": "active", "battery_pct": 76, "lat": -32.591842, "lon": 148.103245, "last_seen": "2026-05-27 09:57:00", "location": "Dubbo", "seen_ago": "18 days ago", "color": "#16a34a"}, {"device_id": "GPS-029", "name": "Patrol 04", "status": "active", "battery_pct": 66, "lat": -28.508038, "lon": 114.607682, "last_seen": "2026-05-27 09:49:00", "location": "Geraldton", "seen_ago": "18 days ago", "color": "#16a34a"}, {"device_id": "GPS-030", "name": "Patrol 05", "status": "idle", "battery_pct": 68, "lat": -30.951555, "lon": 121.608949, "last_seen": "2026-05-27 06:30:00", "location": "Kalgoorlie", "seen_ago": "19 days ago", "color": "#f59e0b"}, {"device_id": "GPS-031", "name": "Ghost Tracker", "status": "active", "battery_pct": -5, "lat": -33.87, "lon": 151.21, "last_seen": "2026-06-15 08:00:00", "location": "Sydney", "seen_ago": "0 min ago", "color": "#16a34a"}, {"device_id": "GPS-032", "name": "Null Island Unit", "status": "idle", "battery_pct": 100, "lat": 0.0, "lon": 0.0, "last_seen": "2025-01-01 00:00:00", "location": "Null Island", "seen_ago": "530 days ago", "color": "#f59e0b"}, {"device_id": "GPS-033", "name": "Duplicate Alpha", "status": "offline", "battery_pct": 50, "lat": -37.81, "lon": 144.96, "last_seen": "2026-05-20 12:00:00", "location": "Melbourne", "seen_ago": "25 days ago", "color": "#64748b"}, {"device_id": "GPS-033", "name": "Duplicate Alpha COPY", "status": "active", "battery_pct": 99, "lat": -37.82, "lon": 144.97, "last_seen": "2026-05-27 09:00:00", "location": "Melbourne", "seen_ago": "18 days ago", "color": "#16a34a"}, {"device_id": "GPS-034", "name": "Arctic Drifter", "status": "low_battery", "battery_pct": 2, "lat": 64.15, "lon": -21.94, "last_seen": "2026-05-27 10:29:00", "location": "Reykjavik", "seen_ago": "18 days ago", "color": "#dc2626"}];
+const summary = {"active": 20, "idle": 7, "offline": 5, "low_battery": 3};
+const colors = {"active": "#16a34a", "idle": "#f59e0b", "offline": "#64748b", "low_battery": "#dc2626"};
+
+const labels = {
+  active: "Active",
+  idle: "Idle",
+  offline: "Offline",
+  low_battery: "Low Battery"
+};
+
+const summaryEl = document.getElementById("summary");
+Object.keys(colors).forEach(s => {
+  summaryEl.innerHTML += `<div class="card">${labels[s]}<b>${summary[s] || 0}</b></div>`;
+});
+
+const legend = document.getElementById("legend");
+Object.keys(colors).forEach(s => {
+  legend.innerHTML += `<span><i class="dot" style="background:${colors[s]}"></i>${labels[s]}</span>`;
+});
+
+const map = document.getElementById("map");
+const minLat = -44, maxLat = -10, minLon = 112, maxLon = 154;
+
+devices.forEach(d => {
+  const x = ((d.lon - minLon) / (maxLon - minLon)) * 100;
+  const y = ((maxLat - d.lat) / (maxLat - minLat)) * 100;
+
+  const m = document.createElement("div");
+  m.className = "marker";
+  m.style.left = x + "%";
+  m.style.top = y + "%";
+  m.style.background = d.color;
+  m.dataset.tip = `${d.device_id} &middot; ${d.name} &middot; ${labels[d.status]} &middot; ${d.location}`;
+  map.appendChild(m);
+
+  document.getElementById("rows").innerHTML += `
+    <tr>
+      <td><b>${d.device_id}</b><br>${d.name}</td>
+      <td><span class="badge" style="background:${d.color}">${labels[d.status]}</span></td>
+      <td>${d.battery_pct}%</td>
+      <td>${d.seen_ago}<br><small>${d.last_seen}</small></td>
+      <td>${d.location}</td>
+    </tr>`;
+});
+</script>
+</body>
+</html>
