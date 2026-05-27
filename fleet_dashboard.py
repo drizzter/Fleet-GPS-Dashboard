@@ -194,31 +194,43 @@ html = f"""<!doctype html>
 <meta charset="utf-8">
 <title>Fleet Dashboard</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
-body{{margin:0;font-family:Arial,sans-serif;background:#f1f5f9;color:#0f172a}}
-header{{background:#0f172a;color:white;padding:24px 32px}}
-h1{{margin:0;font-size:28px}} p{{margin:6px 0 0;color:#cbd5e1}}
-.cards{{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;padding:24px 32px}}
-.card{{background:white;border-radius:16px;padding:18px;box-shadow:0 8px 20px #0001}}
-.card b{{font-size:30px;display:block;margin-top:6px}}
-.main{{display:grid;grid-template-columns:1.2fr 1fr;gap:24px;padding:0 32px 32px}}
-.panel{{background:white;border-radius:18px;padding:18px;box-shadow:0 8px 20px #0001}}
-#map{{height:560px;background:#e0f2fe;border-radius:16px;position:relative;overflow:hidden}}
-.marker{{position:absolute;width:16px;height:16px;border-radius:50%;border:3px solid white;transform:translate(-50%,-50%);box-shadow:0 3px 10px #0005;cursor:pointer}}
-.marker:hover::after{{content:attr(data-tip);position:absolute;left:18px;top:-8px;background:#0f172a;color:white;padding:8px 10px;border-radius:8px;white-space:nowrap;z-index:5}}
-table{{width:100%;border-collapse:collapse;font-size:14px}}
-th,td{{padding:10px;border-bottom:1px solid #e2e8f0;text-align:left}}
-th{{font-size:12px;text-transform:uppercase;color:#64748b}}
-.badge{{color:white;border-radius:999px;padding:4px 9px;font-size:12px;font-weight:bold}}
-.legend{{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}}
-.dot{{width:11px;height:11px;border-radius:50%;display:inline-block;margin-right:5px}}
-@media(max-width:900px){{.main{{grid-template-columns:1fr}}}}
+*{{margin:0;padding:0;box-sizing:border-box}}
+body{{font-family:'Segoe UI',Arial,sans-serif;background:#f1f5f9;color:#0f172a}}
+header{{background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);color:white;padding:28px 32px}}
+h1{{margin:0;font-size:26px;font-weight:700;letter-spacing:-0.5px}}
+header p{{margin:6px 0 0;color:#94a3b8;font-size:14px}}
+.cards{{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:16px;padding:24px 32px}}
+.card{{background:white;border-radius:14px;padding:18px 20px;box-shadow:0 1px 3px #0001,0 8px 24px #0000000a;border:1px solid #e2e8f0}}
+.card .label{{font-size:13px;color:#64748b;font-weight:500;text-transform:uppercase;letter-spacing:0.5px}}
+.card b{{font-size:32px;display:block;margin-top:4px;font-weight:700}}
+.main{{display:grid;grid-template-columns:1.3fr 1fr;gap:24px;padding:0 32px 32px}}
+.panel{{background:white;border-radius:18px;padding:20px;box-shadow:0 1px 3px #0001,0 8px 24px #0000000a;border:1px solid #e2e8f0}}
+.panel h2{{font-size:16px;font-weight:600;margin-bottom:14px;color:#334155}}
+#map{{height:580px;border-radius:14px;z-index:1}}
+.legend{{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px}}
+.legend-item{{display:flex;align-items:center;gap:6px;font-size:13px;color:#475569;font-weight:500}}
+.legend-dot{{width:12px;height:12px;border-radius:50%;border:2px solid white;box-shadow:0 1px 3px #0003}}
+table{{width:100%;border-collapse:collapse;font-size:13px}}
+th,td{{padding:10px 12px;border-bottom:1px solid #f1f5f9;text-align:left}}
+th{{font-size:11px;text-transform:uppercase;color:#94a3b8;font-weight:600;letter-spacing:0.5px}}
+tr:hover{{background:#f8fafc}}
+.badge{{color:white;border-radius:999px;padding:3px 10px;font-size:11px;font-weight:600;display:inline-block}}
+.device-id{{font-weight:700;color:#0f172a;font-size:13px}}
+.device-name{{color:#64748b;font-size:12px}}
+.time-ago{{font-weight:500;color:#334155;font-size:13px}}
+.time-full{{color:#94a3b8;font-size:11px}}
+.battery-bar{{width:50px;height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden;display:inline-block;vertical-align:middle;margin-right:6px}}
+.battery-fill{{height:100%;border-radius:3px}}
+@media(max-width:960px){{.main{{grid-template-columns:1fr}}#map{{height:400px}}}}
 </style>
 </head>
 <body>
 <header>
-<h1>Fleet GPS Dashboard</h1>
-<p>{len(devices)} GPS tracking devices across Australia &middot; Snapshot based on latest CSV ping</p>
+<h1>&#x1F69A; Fleet GPS Dashboard</h1>
+<p>{len(devices)} GPS tracking devices across Australia &middot; Real-time map &middot; Last updated from CSV snapshot</p>
 </header>
 
 <section class="cards" id="summary"></section>
@@ -232,10 +244,12 @@ th{{font-size:12px;text-transform:uppercase;color:#64748b}}
 
 <div class="panel">
 <h2>Device List</h2>
+<div style="overflow-x:auto;max-height:580px;overflow-y:auto">
 <table>
-<thead><tr><th>Device</th><th>Status</th><th>Battery</th><th>Last Seen</th><th>Location</th></tr></thead>
+<thead style="position:sticky;top:0;background:white;z-index:2"><tr><th>Device</th><th>Status</th><th>Battery</th><th>Last Seen</th><th>Location</th></tr></thead>
 <tbody id="rows"></tbody>
 </table>
+</div>
 </div>
 </section>
 
@@ -251,37 +265,79 @@ const labels = {{
   low_battery: "Low Battery"
 }};
 
+// Summary cards
 const summaryEl = document.getElementById("summary");
 Object.keys(colors).forEach(s => {{
-  summaryEl.innerHTML += `<div class="card">${{labels[s]}}<b>${{summary[s] || 0}}</b></div>`;
+  summaryEl.innerHTML += `<div class="card"><div class="label">${{labels[s]}}</div><b style="color:${{colors[s]}}">${{summary[s] || 0}}</b></div>`;
 }});
 
+// Legend
 const legend = document.getElementById("legend");
 Object.keys(colors).forEach(s => {{
-  legend.innerHTML += `<span><i class="dot" style="background:${{colors[s]}}"></i>${{labels[s]}}</span>`;
+  legend.innerHTML += `<span class="legend-item"><span class="legend-dot" style="background:${{colors[s]}}"></span>${{labels[s]}}</span>`;
 }});
 
-const map = document.getElementById("map");
-const minLat = -44, maxLat = -10, minLon = 112, maxLon = 154;
+// Leaflet map
+const map = L.map("map", {{
+  zoomControl: true,
+  scrollWheelZoom: true
+}}).setView([-25.5, 134], 4);
+
+L.tileLayer("https://{{s}}.basemaps.cartocdn.com/light_all/{{z}}/{{x}}/{{y}}{{r}}.png", {{
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+  subdomains: "abcd",
+  maxZoom: 19
+}}).addTo(map);
+
+// Add markers
+devices.forEach(d => {{
+  const marker = L.circleMarker([d.lat, d.lon], {{
+    radius: 8,
+    fillColor: d.color,
+    color: "#fff",
+    weight: 2.5,
+    opacity: 1,
+    fillOpacity: 0.9
+  }}).addTo(map);
+
+  marker.bindPopup(`
+    <div style="font-family:Segoe UI,Arial,sans-serif;min-width:180px">
+      <div style="font-weight:700;font-size:14px;margin-bottom:4px">${{d.device_id}} &middot; ${{d.name}}</div>
+      <div style="margin-bottom:3px"><span style="background:${{d.color}};color:white;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600">${{labels[d.status]}}</span></div>
+      <div style="font-size:12px;color:#64748b;margin-top:6px">
+        Battery: <b>${{d.battery_pct}}%</b><br>
+        Last seen: ${{d.seen_ago}}<br>
+        Location: ${{d.location}}
+      </div>
+    </div>
+  `);
+
+  marker.bindTooltip(`${{d.device_id}} &middot; ${{d.name}}`, {{
+    direction: "top",
+    offset: [0, -8]
+  }});
+}});
+
+// Fit map to markers
+if (devices.length > 0) {{
+  const bounds = L.latLngBounds(devices.map(d => [d.lat, d.lon]));
+  map.fitBounds(bounds, {{ padding: [40, 40] }});
+}}
+
+// Device table
+function batteryColor(pct) {{
+  if (pct >= 60) return "#16a34a";
+  if (pct >= 30) return "#f59e0b";
+  return "#dc2626";
+}}
 
 devices.forEach(d => {{
-  const x = ((d.lon - minLon) / (maxLon - minLon)) * 100;
-  const y = ((maxLat - d.lat) / (maxLat - minLat)) * 100;
-
-  const m = document.createElement("div");
-  m.className = "marker";
-  m.style.left = x + "%";
-  m.style.top = y + "%";
-  m.style.background = d.color;
-  m.dataset.tip = `${{d.device_id}} &middot; ${{d.name}} &middot; ${{labels[d.status]}} &middot; ${{d.location}}`;
-  map.appendChild(m);
-
   document.getElementById("rows").innerHTML += `
     <tr>
-      <td><b>${{d.device_id}}</b><br>${{d.name}}</td>
+      <td><span class="device-id">${{d.device_id}}</span><br><span class="device-name">${{d.name}}</span></td>
       <td><span class="badge" style="background:${{d.color}}">${{labels[d.status]}}</span></td>
-      <td>${{d.battery_pct}}%</td>
-      <td>${{d.seen_ago}}<br><small>${{d.last_seen}}</small></td>
+      <td><span class="battery-bar"><span class="battery-fill" style="width:${{d.battery_pct}}%;background:${{batteryColor(d.battery_pct)}}"></span></span>${{d.battery_pct}}%</td>
+      <td><span class="time-ago">${{d.seen_ago}}</span><br><span class="time-full">${{d.last_seen}}</span></td>
       <td>${{d.location}}</td>
     </tr>`;
 }});
